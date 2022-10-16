@@ -1,0 +1,48 @@
+# Loads default set of integrations. Do not remove.
+default_config:
+
+# Text to speech
+tts:
+  - platform: google_translate
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+mqtt:
+  cover:
+    - name: "living-room-small"
+      command_topic: "shutters/living-room-small/set"
+      set_position_topic: "shutters/living-room-small/set_position"
+      position_topic: "shutters/living-room-small/position"
+      state_topic: "shutters/living-room-small/state"
+      retain: false
+      qos: 2
+    - name: "living-room-big"
+      command_topic: "shutters/living-room-big/set"
+      set_position_topic: "shutters/living-room-big/set_position"
+      position_topic: "shutters/living-room-big/position"
+      state_topic: "shutters/living-room-big/state"
+      retain: false
+      qos: 2
+    - name: "office"
+      command_topic: "shutters/office/set"
+      set_position_topic: "shutters/office/set_position"
+      position_topic: "shutters/office/position"
+      state_topic: "shutters/office/state"
+      retain: false
+      qos: 2
+    - name: "bedroom-1"
+      command_topic: "shutters/bedroom-1/set"
+      set_position_topic: "shutters/bedroom-1/set_position"
+      position_topic: "shutters/bedroom-1/position"
+      state_topic: "shutters/bedroom-1/state"
+      retain: false
+      qos: 2
+    - name: "bedroom-2"
+      command_topic: "shutters/bedroom-2/set"
+      set_position_topic: "shutters/bedroom-2/set_position"
+      position_topic: "shutters/bedroom-2/position"
+      state_topic: "shutters/bedroom-2/state"
+      retain: false
+      qos: 2
