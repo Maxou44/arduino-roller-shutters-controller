@@ -13,12 +13,12 @@ Work in progress project to connect roller shutters by simulating a press on the
 Supported features:
 - MQTT Action: Open
 - MQTT Action: Close
+- MQTT Action: Stop
 - MQTT Action: Set position
 - MQTT Feedback: Position
 - MQTT Feedback: State
 
 To do:
-- Documentation
 - Split and reorganize code
 - Avoid to start a new event if the shutter is moving
 
