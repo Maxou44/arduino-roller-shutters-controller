@@ -3,7 +3,7 @@
 
 void (*resetFunc)(void) = 0;
 
-char ssid[] = "";  // your network SSID (name)
+char ssid[] = "";                   // your network SSID (name)
 char pass[] = "";  // your network password (use for WPA, or use as key for WEP)
 
 WiFiClient wifiClient;
@@ -220,10 +220,7 @@ void onMqttMessage(int messageSize) {
 
   Serial.print("\" (");
   Serial.print(messageSize);
-  Serial.print(")");
-
-  Serial.println();
-  Serial.println();
+  Serial.println(")");
 
   if (strcmp(content, "CLOSE") == 0) {
     applyReduceTime(moveTo(shutterIndex, 100));
@@ -316,6 +313,43 @@ void subscribeMqtt(int shutterIndex) {
   mqttClient.subscribe(topic);
 }
 
+void wifiLoop() {
+  int status = WiFi.status();
+
+  if (status != WL_CONNECTED) {
+    Serial.print("Connecting to Wifi: ");
+    Serial.println(ssid);
+    while (status != WL_CONNECTED) {
+      status = WiFi.begin(ssid, pass);
+      delay(1000);
+    }
+    Serial.println("Connected to the network!");
+    Serial.println();
+  }
+}
+
+void mqttLoop() {
+  while (!mqttClient.connected()) {
+    Serial.print("Connecting to MQTT: ");
+    Serial.println(broker);
+    if (!mqttClient.connect(broker, port)) {
+      Serial.print("MQTT connection failed! Error code = ");
+      Serial.println(mqttClient.connectError());
+    } else {
+      Serial.println("Connected to MQTT!");
+      Serial.println();
+      // Subscribe
+      mqttClient.onMessage(onMqttMessage);
+      for (int i = 0; i < nbRollerShutters; i++) {
+        // Subscribe
+        subscribeMqtt(i);
+        sendShutterData(i, TYPE_POSITION, "100");  // 100 is open value
+        sendShutterData(i, TYPE_STATE, "state_opened");
+      }
+    }
+  }
+  mqttClient.poll();
+}
 
 // Run at startup
 void setup() {
@@ -343,50 +377,18 @@ void setup() {
     currentDurations[i] = 0L;
     currentPositions[i] = 0L;
   }
-
-  // WIFI
-  Serial.print("Connecting to Wifi: ");
-  Serial.println(ssid);
-  while (WiFi.begin(ssid, pass) != WL_CONNECTED) {
-    Serial.print(".");
-    delay(5000);
-  }
-  Serial.println("Connected to the network!");
-  Serial.println();
-
-  // MQTT
-  Serial.print("Connecting to MQTT: ");
-  Serial.println(broker);
-  if (!mqttClient.connect(broker, port)) {
-    Serial.print("MQTT connection failed! Error code = ");
-    Serial.println(mqttClient.connectError());
-    resetFunc();
-    while (1)
-      ;
-  }
-  Serial.println("Connected to MQTT!");
-  Serial.println();
-
-  // Subscribe
-  mqttClient.onMessage(onMqttMessage);
-  for (int i = 0; i < nbRollerShutters; i++) {
-    // Subscribe
-    subscribeMqtt(i);
-    sendShutterData(i, TYPE_POSITION, "100");  // 100 is open value
-    sendShutterData(i, TYPE_STATE, "state_opened");
-  }
 }
 
 // Main loop
 void loop() {
-  mqttClient.poll();
 
-  if (Serial.available() != 0) {
-    long position = Serial.parseInt();
-    applyReduceTime(moveTo(4, position));
-    //moveTo(1, position);
-  }
+  // Wifi
+  wifiLoop();
 
+  // MQTT
+  mqttLoop();
+
+  // Apply auto reduce time
   delay(50L);
   applyReduceTime(50L);
 
