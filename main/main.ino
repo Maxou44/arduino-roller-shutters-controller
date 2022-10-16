@@ -249,8 +249,8 @@ void onMqttMessage(int messageSize) {
     currentDurations[shutterIndex] = 0L;
 
     // Send MQTT statuses
-    sendPosition(shutterIndex, currentPositions[i]);
-    sendStateBasedOnPosition(shutterIndex, currentPositions[i], STOP);
+    sendPosition(shutterIndex, currentPositions[shutterIndex]);
+    sendStateBasedOnPosition(shutterIndex, currentPositions[shutterIndex], STOP);
 
   } else {
     long position = strtol(content, NULL, 10);
@@ -366,8 +366,14 @@ void setup() {
   // Init serial for debug
   Serial.begin(9600);
 
+  Serial.println("[Setup] Hello world :)");
+
   // Init output pins
   for (int i = 0; i < nbRollerShutters; i++) {
+    Serial.print("[Setup] Configuring \"");
+    Serial.print(rollerShutterList[i].name);
+    Serial.println("\"");
+
     // Configure pins
     pinMode(rollerShutterList[i].openingPin, OUTPUT);
     pinMode(rollerShutterList[i].closingPin, OUTPUT);
@@ -376,7 +382,7 @@ void setup() {
     digitalWrite(rollerShutterList[i].openingPin, LOW);
     digitalWrite(rollerShutterList[i].closingPin, LOW);
 
-    delay(2000);
+    delay(1000);
 
     // Open all the roller shutters (to calibrate)
     triggerPin(rollerShutterList[i].openingPin);
@@ -387,6 +393,8 @@ void setup() {
     currentDurations[i] = 0L;
     currentPositions[i] = 0L;
   }
+
+  Serial.println();
 }
 
 // Main loop
