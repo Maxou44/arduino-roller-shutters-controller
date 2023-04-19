@@ -143,10 +143,26 @@ void applyReduceTime(long deltaDuration) {
   }
 }
 
+void sendStateBasedOnPosition(int shutterIndex, long position, int movement) {
+  if (movement == STOP) {
+    sendMqttMessage(shutterIndex, TYPE_STATE, position == 0 ? "state_opened" : position == 100L ? "state_closed"
+                                                                                                : "state_stopped");
+  } else if (movement == UP) {
+    sendMqttMessage(shutterIndex, TYPE_STATE, "state_opening");
+  } else if (movement == DOWN) {
+    sendMqttMessage(shutterIndex, TYPE_STATE, "state_closing");
+  }
+}
+
+void sendPosition(int shutterIndex, long position) {
+  char buffer[sizeof(long) * 10 + 1];
+  ltoa(100L - position, buffer, 10);
+  sendMqttMessage(shutterIndex, TYPE_POSITION, buffer);
+}
+
 // Automatically sent a stop event if the timer is equal to 0 and the shutter is active
 void autoStopBasedOnDelay() {
   long d = 0L;
-  char buffer[sizeof(long) * 10 + 1];
 
   for (int i = 0; i < nbRollerShutters; i++) {
     if (currentDurations[i] <= 0L && currentMovements[i] != STOP) {
@@ -154,18 +170,13 @@ void autoStopBasedOnDelay() {
       if (currentPositions[i] > 0L && currentPositions[i] < 100L) {
         d += sendSignal(i, STOP);
       }
-      sendShutterData(i, TYPE_STATE, currentPositions[i] == 0 ? "state_opened" : currentPositions[i] == 100L ? "state_closed"
-                                                                                                             : "state_stopped");
-      ltoa(100L - currentPositions[i], buffer, 10);
-      sendShutterData(i, TYPE_POSITION, buffer);
+
+      // Send MQTT statuses
+      sendStateBasedOnPosition(i, currentPositions[i], STOP);
+      sendPosition(i, currentPositions[i]);
 
       currentDurations[i] = 0L;
       currentMovements[i] = STOP;
-    } else if (currentMovements[i] == STOP) {
-      /*sendShutterData(i, TYPE_STATE, currentPositions[i] == 0 ? "state_opened" : currentPositions[i] == 100L ? "state_closed"
-                                                                                                             : "state_stopped");
-      ltoa(100L - currentPositions[i], buffer, 10);
-      sendShutterData(i, TYPE_POSITION, buffer);*/
     }
   }
   if (d > 0L) {
@@ -182,7 +193,7 @@ long moveTo(int shutterIndex, long position) {
   logMoveTo(position > currentPositions[shutterIndex] ? "DOWN" : "UP", shutterIndex, currentPositions[shutterIndex], position, duration, percent);
 
   if (position > currentPositions[shutterIndex] || position < currentPositions[shutterIndex] || position == 0L || position == 100L) {
-    sendShutterData(shutterIndex, TYPE_STATE, position > currentPositions[shutterIndex] ? "state_closing" : "state_opening");
+    sendStateBasedOnPosition(shutterIndex, currentPositions[shutterIndex], position > currentPositions[shutterIndex] ? DOWN : UP);
     d = sendSignal(shutterIndex, position > currentPositions[shutterIndex] ? DOWN : UP);
     currentMovements[shutterIndex] = position > currentPositions[shutterIndex] ? DOWN : UP;
     currentDurations[shutterIndex] = duration;
@@ -195,7 +206,6 @@ long moveTo(int shutterIndex, long position) {
 void onMqttMessage(int messageSize) {
   char topic[50] = "";
   char content[50] = "";
-  char buffer[sizeof(long) * 10 + 1];
   long delta = 0L;
   int i = 0;
 
@@ -238,10 +248,10 @@ void onMqttMessage(int messageSize) {
     currentMovements[shutterIndex] = STOP;
     currentDurations[shutterIndex] = 0L;
 
-    // Update
-    ltoa(100L - currentPositions[shutterIndex], buffer, 10);
-    sendShutterData(shutterIndex, TYPE_POSITION, buffer);
-    sendShutterData(shutterIndex, TYPE_STATE, "state_stopped");
+    // Send MQTT statuses
+    sendPosition(shutterIndex, currentPositions[shutterIndex]);
+    sendStateBasedOnPosition(shutterIndex, currentPositions[shutterIndex], STOP);
+
   } else {
     long position = strtol(content, NULL, 10);
     if (position >= 0L && position <= 100L && currentDurations[shutterIndex] <= 0 && currentPositions[shutterIndex] != position) {
@@ -261,7 +271,7 @@ void sendMqttMessage(char *topic, const char *value) {
   mqttClient.endMessage();
 }
 
-void sendShutterData(int shutterIndex, int type, const char *value) {
+void sendMqttMessage(int shutterIndex, int type, const char *value) {
   char topic[200] = "shutters/";
 
   strcat(topic, rollerShutterList[shutterIndex].name);
@@ -343,8 +353,8 @@ void mqttLoop() {
       for (int i = 0; i < nbRollerShutters; i++) {
         // Subscribe
         subscribeMqtt(i);
-        sendShutterData(i, TYPE_POSITION, "100");  // 100 is open value
-        sendShutterData(i, TYPE_STATE, "state_opened");
+        sendStateBasedOnPosition(i, currentPositions[i], STOP);
+        sendPosition(i, currentPositions[i]);
       }
     }
   }
@@ -356,8 +366,14 @@ void setup() {
   // Init serial for debug
   Serial.begin(9600);
 
+  Serial.println("[Setup] Hello world :)");
+
   // Init output pins
   for (int i = 0; i < nbRollerShutters; i++) {
+    Serial.print("[Setup] Configuring \"");
+    Serial.print(rollerShutterList[i].name);
+    Serial.println("\"");
+
     // Configure pins
     pinMode(rollerShutterList[i].openingPin, OUTPUT);
     pinMode(rollerShutterList[i].closingPin, OUTPUT);
@@ -370,13 +386,15 @@ void setup() {
 
     // Open all the roller shutters (to calibrate)
     triggerPin(rollerShutterList[i].openingPin);
-    delay(250);
+    delay(1000);
 
     // Reset movements, durations and positions
     currentMovements[i] = STOP;
     currentDurations[i] = 0L;
     currentPositions[i] = 0L;
   }
+
+  Serial.println();
 }
 
 // Main loop
